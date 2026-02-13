@@ -4,37 +4,34 @@ import { storageService } from '../services/storageService';
 import { Job, SystemData, Box } from '../types';
 import { ZONES } from '../constants';
 
+// Fix: Update interface to include data and onRefresh props
 interface OperationViewProps {
+  data: SystemData;
+  onRefresh: () => void;
   onNavigate?: (tab: string) => void;
 }
 
-const OperationView: React.FC<OperationViewProps> = ({ onNavigate }) => {
-  const [data, setData] = useState<SystemData>(storageService.getData());
+// Fix: Receive data and onRefresh from props instead of internal state
+const OperationView: React.FC<OperationViewProps> = ({ data, onRefresh, onNavigate }) => {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [showZonePicker, setShowZonePicker] = useState(false);
   const [opSuccess, setOpSuccess] = useState<string | null>(null);
 
-  const refreshData = () => {
-    const newData = storageService.getData();
-    setData({ ...newData });
-    if (selectedJobId && !newData.jobs.some(j => j.id === selectedJobId && j.status === 'pulled')) {
-      setSelectedJobId(null);
-    }
-  };
-
   const activeJobs = data.jobs.filter(j => j.status === 'pulled');
   const selectedJob = activeJobs.find(j => j.id === selectedJobId);
 
-  const handleReturnToZone = (zone: string) => {
+  // Fix: handleReturnToZone must be async to await storage updates
+  const handleReturnToZone = async (zone: string) => {
     if (!selectedJob) return;
 
-    storageService.updateJob(selectedJob.id, { 
+    await storageService.updateJob(selectedJob.id, { 
       status: 'stored', 
       zone: zone,
       returnedAt: new Date().toISOString() 
     });
     
-    refreshData();
+    // Fix: Call onRefresh from props
+    onRefresh();
     setShowZonePicker(false);
     setSelectedJobId(null);
     setOpSuccess(`✅ คืนงาน ${selectedJob.jobNumber} ไปที่โซน ${zone} เรียบร้อย!`);
@@ -45,22 +42,23 @@ const OperationView: React.FC<OperationViewProps> = ({ onNavigate }) => {
     }, 1200);
   };
 
-  const toggleBoxIssue = (boxId: string) => {
+  // Fix: toggleBoxIssue must be async to await storage updates
+  const toggleBoxIssue = async (boxId: string) => {
     if (!selectedJob) return;
     const box = selectedJob.boxes.find(b => b.id === boxId);
     if (box?.hasIssue) {
       if (confirm("ล้างสถานะแจ้งปัญหา?")) {
         const updated = selectedJob.boxes.map(b => b.id === boxId ? { ...b, hasIssue: false, issueNote: undefined } : b);
-        storageService.updateJob(selectedJob.id, { boxes: updated });
-        refreshData();
+        await storageService.updateJob(selectedJob.id, { boxes: updated });
+        onRefresh();
       }
       return;
     }
     const note = prompt("ระบุปัญหาที่พบ:");
     if (!note) return;
     const updated = selectedJob.boxes.map(b => b.id === boxId ? { ...b, hasIssue: true, issueNote: note } : b);
-    storageService.updateJob(selectedJob.id, { boxes: updated });
-    refreshData();
+    await storageService.updateJob(selectedJob.id, { boxes: updated });
+    onRefresh();
   };
 
   return (

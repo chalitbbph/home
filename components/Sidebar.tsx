@@ -7,16 +7,15 @@ interface SidebarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
   onLogout: () => void;
+  isSyncing?: boolean;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ role, activeTab, onTabChange, onLogout }) => {
-  // เมนูพื้นฐานสำหรับทุกคน
+const Sidebar: React.FC<SidebarProps> = ({ role, activeTab, onTabChange, onLogout, isSyncing }) => {
   const tabs = [
     { id: 'finding', label: 'ศูนย์ค้นหา', icon: '🔍' },
     { id: 'operation', label: 'หน้าปฏิบัติงาน', icon: '⚡' },
   ];
 
-  // เมนูเพิ่มเติมสำหรับผู้ดูแลเท่านั้น
   if (role === 'admin') {
     tabs.push(
       { id: 'trash', label: 'ถังขยะระบบ', icon: '🗑️' },
@@ -50,7 +49,14 @@ const Sidebar: React.FC<SidebarProps> = ({ role, activeTab, onTabChange, onLogou
 
       <div className="p-4 border-t border-slate-800">
         <div className="mb-6 px-4 hidden md:block">
-          <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em] mb-1">สิทธิ์การใช้งาน</p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em]">Cloud Status</p>
+            {isSyncing ? (
+              <span className="text-[8px] bg-blue-600 text-white px-2 py-0.5 rounded animate-pulse">SYNCING</span>
+            ) : (
+              <span className="text-[8px] bg-green-600 text-white px-2 py-0.5 rounded">CONNECTED</span>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <div className={`w-2 h-2 rounded-full ${role === 'admin' ? 'bg-red-500' : 'bg-green-500'} animate-pulse`}></div>
             <p className="text-sm text-slate-200 font-black uppercase tracking-tight">

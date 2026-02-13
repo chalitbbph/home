@@ -1,7 +1,7 @@
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import { storageService } from '../services/storageService';
-import { Job, SystemData, Box } from '../types';
+import { SystemData, Box } from '../types';
 
 interface TrashBoxItem {
   jobId: string;
@@ -9,19 +9,17 @@ interface TrashBoxItem {
   box: Box;
 }
 
-const TrashBox: React.FC = () => {
-  const [data, setData] = useState<SystemData>(storageService.getData());
+// Fix: Add interface for props
+interface Props {
+  data: SystemData;
+  onRefresh: () => void;
+}
+
+// Fix: Use data and onRefresh from props
+const TrashBox: React.FC<Props> = ({ data, onRefresh }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [permDeleteConfirm, setPermDeleteConfirm] = useState<{jobId: string, boxId: string, boxNo: string} | null>(null);
   
-  const refreshData = () => {
-    setData(storageService.getData());
-  };
-
-  useEffect(() => {
-    refreshData();
-  }, []);
-
   // ดึงกล่องทั้งหมดจากงานที่ถูกลบมาทำเป็น List เดียวกัน และกรองด้วย Search Query
   const filteredDeletedBoxItems = useMemo(() => {
     const items: TrashBoxItem[] = [];
@@ -45,11 +43,12 @@ const TrashBox: React.FC = () => {
     return items;
   }, [data.jobs, searchQuery]);
 
-  const executePermanentDelete = () => {
+  // Fix: executePermanentDelete must be async to await storage service
+  const executePermanentDelete = async () => {
     if (permDeleteConfirm) {
-      storageService.permanentDeleteBox(permDeleteConfirm.jobId, permDeleteConfirm.boxId);
+      await storageService.permanentDeleteBox(permDeleteConfirm.jobId, permDeleteConfirm.boxId);
       setPermDeleteConfirm(null);
-      refreshData();
+      onRefresh();
     }
   };
 

@@ -1,15 +1,20 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { storageService } from '../services/storageService';
 import { Job, Box, SystemData, Customer } from '../types';
 import { ZONES, COLORS } from '../constants';
 
-const AdminDashboard: React.FC = () => {
-  const [data, setData] = useState<SystemData>(storageService.getData());
+// Fix: Add interface for props
+interface Props {
+  data: SystemData;
+  onRefresh: () => void;
+}
+
+// Fix: Use data and onRefresh from props
+const AdminDashboard: React.FC<Props> = ({ data, onRefresh }) => {
   const [view, setView] = useState<'overview' | 'create-job' | 'customers'>('overview');
   const [newJobBoxes, setNewJobBoxes] = useState<Box[]>([]);
   
-  // State สำหรับป๊อปอัปยืนยันการลบ
   const [deleteConfirm, setDeleteConfirm] = useState<{id: string, no: string} | null>(null);
 
   const [custName, setCustName] = useState('');
@@ -20,15 +25,8 @@ const AdminDashboard: React.FC = () => {
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [zone, setZone] = useState('A');
 
-  const refreshData = () => {
-    const freshData = storageService.getData();
-    setData({ ...freshData });
-  };
-
-  // กรองเฉพาะงานที่ยังไม่ถูกลบ
   const activeJobs = useMemo(() => data.jobs.filter(j => j.status !== 'deleted'), [data.jobs]);
 
-  // คำนวณสรุปข้อมูลรายโซน
   const zoneSummaries = useMemo(() => {
     return ZONES.map(z => {
       const jobsInZone = activeJobs.filter(j => j.zone === z);
@@ -57,7 +55,8 @@ const AdminDashboard: React.FC = () => {
     setNewJobBoxes([...newJobBoxes, newBox]);
   };
 
-  const handleCreateCustomer = (e: React.FormEvent) => {
+  // Fix: handleCreateCustomer must be async to await storage service
+  const handleCreateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!custName) return;
     const newCust: Customer = {
@@ -66,16 +65,16 @@ const AdminDashboard: React.FC = () => {
       contact: custContact,
       createdAt: new Date().toISOString()
     };
-    storageService.createCustomer(newCust);
+    await storageService.createCustomer(newCust);
     setCustName(''); setCustContact('');
-    refreshData();
-    alert(`✅ บันทึกข้อมูลลูกค้า "${newCust.name}" เรียบร้อย!`);
+    onRefresh();
   };
 
-  const handleCreateJob = (e: React.FormEvent) => {
+  // Fix: handleCreateJob must be async to await storage service
+  const handleCreateJob = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!jobName || !selectedCustomerId || !productSize || newJobBoxes.length === 0) {
-      alert("⚠️ กรุณากรอกรายละเอียดให้ครบ: ชื่อโครงการ, ไซส์สินค้า และเพิ่มกล่องอย่างน้อย 1 ใบ");
+      alert("⚠️ กรุณากรอกรายละเอียดให้ครบ");
       return;
     }
 
@@ -91,81 +90,69 @@ const AdminDashboard: React.FC = () => {
       createdAt: new Date().toISOString()
     };
 
-    storageService.createJob(newJob);
-    alert(`📦 สร้างงาน ${newJob.jobNumber} สำเร็จ!`);
-    
+    await storageService.createJob(newJob);
     setJobName(''); setProductSize(''); setSelectedCustomerId(''); setNewJobBoxes([]);
-    refreshData();
+    onRefresh();
     setView('overview');
   };
 
-  const executeDelete = () => {
+  // Fix: executeDelete must be async to await storage service
+  const executeDelete = async () => {
     if (deleteConfirm) {
-      storageService.deleteJob(deleteConfirm.id);
+      await storageService.deleteJob(deleteConfirm.id);
       setDeleteConfirm(null);
-      refreshData();
+      onRefresh();
     }
   };
 
   return (
-    <div className="space-y-6 relative pb-20">
-      {/* Custom Delete Confirmation Modal */}
+    <div className="space-y-8 relative pb-20 animate-in fade-in duration-500">
       {deleteConfirm && (
-        <div className="fixed inset-0 z-[200] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-[2.5rem] p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95 text-center">
-            <div className="text-6xl mb-4">⚠️</div>
-            <h3 className="text-2xl font-black text-slate-900 mb-2 uppercase">ยืนยันการลบงาน?</h3>
+        <div className="fixed inset-0 z-[200] bg-slate-900/90 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white rounded-[3rem] p-10 max-w-md w-full shadow-2xl animate-in zoom-in-95 text-center">
+            <div className="text-6xl mb-6">⚠️</div>
+            <h3 className="text-3xl font-black text-slate-900 mb-2 uppercase">ย้ายงานไปถังขยะ?</h3>
             <p className="text-slate-500 mb-8 font-bold text-sm">
-              คุณต้องการลบงาน <span className="text-red-600 font-black">{deleteConfirm.no}</span> ใช่หรือไม่?<br/>
-              รายการจะถูกย้ายไปที่หน้า <span className="text-slate-900 font-black">"ถังขยะระบบ"</span>
+              คุณต้องการย้ายงาน <span className="text-red-600 font-black">{deleteConfirm.no}</span><br/>
+              ไปที่หน้า "ถังขยะระบบ" หรือไม่?
             </p>
-            <div className="flex gap-3">
-              <button 
-                onClick={() => setDeleteConfirm(null)}
-                className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-500 font-black rounded-2xl transition-all uppercase text-xs"
-              >
-                ยกเลิก
-              </button>
-              <button 
-                onClick={executeDelete}
-                className="flex-1 py-4 bg-red-600 hover:bg-red-700 text-white font-black rounded-2xl shadow-xl shadow-red-200 transition-all uppercase text-xs"
-              >
-                ยืนยันการลบ
-              </button>
+            <div className="flex gap-4">
+              <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-4 bg-slate-100 text-slate-500 font-black rounded-2xl uppercase text-xs">ยกเลิก</button>
+              <button onClick={executeDelete} className="flex-1 py-4 bg-red-600 text-white font-black rounded-2xl shadow-xl shadow-red-200 uppercase text-xs">ยืนยันการย้าย</button>
             </div>
           </div>
         </div>
       )}
 
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight uppercase">แผงควบคุมระบบ</h1>
-          <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mt-1">จัดการคลังสินค้าและลูกค้าเชิงลึก</p>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight uppercase">Dashboard</h1>
+          <p className="text-slate-400 font-black uppercase text-[10px] tracking-[0.2em] mt-1 bg-slate-100 w-fit px-3 py-1 rounded-full">System Administration & Statistics</p>
         </div>
-        <div className="flex bg-slate-200 p-1.5 rounded-2xl shadow-inner">
-          <button onClick={() => setView('overview')} className={`px-6 py-2 rounded-xl text-xs font-black transition-all ${view === 'overview' ? 'bg-white shadow-md text-blue-600' : 'text-slate-600'}`}>ภาพรวมคลัง</button>
-          <button onClick={() => setView('customers')} className={`px-6 py-2 rounded-xl text-xs font-black transition-all ${view === 'customers' ? 'bg-white shadow-md text-blue-600' : 'text-slate-600'}`}>ฐานข้อมูลลูกค้า</button>
-          <button onClick={() => setView('create-job')} className={`px-6 py-2 rounded-xl text-xs font-black transition-all ${view === 'create-job' ? 'bg-white shadow-md text-blue-600' : 'text-slate-600'}`}>+ ลงงานใหม่</button>
+        <div className="flex bg-slate-200/50 p-2 rounded-[2rem] shadow-inner backdrop-blur-sm border border-slate-200">
+          <button onClick={() => setView('overview')} className={`px-8 py-3 rounded-[1.5rem] text-xs font-black transition-all ${view === 'overview' ? 'bg-white shadow-xl text-blue-600 scale-105' : 'text-slate-500 hover:text-slate-700'}`}>OVERVIEW</button>
+          <button onClick={() => setView('customers')} className={`px-8 py-3 rounded-[1.5rem] text-xs font-black transition-all ${view === 'customers' ? 'bg-white shadow-xl text-blue-600 scale-105' : 'text-slate-500 hover:text-slate-700'}`}>CUSTOMERS</button>
+          <button onClick={() => setView('create-job')} className={`px-8 py-3 rounded-[1.5rem] text-xs font-black transition-all ${view === 'create-job' ? 'bg-white shadow-xl text-blue-600 scale-105' : 'text-slate-500 hover:text-slate-700'}`}>NEW JOB</button>
         </div>
       </div>
 
       {view === 'overview' && (
-        <>
-          {/* Dashboard Summaries */}
+        <div className="space-y-8">
+          {/* Summary Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
             {zoneSummaries.map(summary => (
-              <div key={summary.zone} className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col items-center text-center transition-all hover:shadow-md hover:-translate-y-1">
-                <div className="w-10 h-10 bg-slate-900 text-white rounded-xl flex items-center justify-center font-black text-lg mb-3 shadow-lg">
+              <div key={summary.zone} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col items-center text-center transition-all hover:shadow-xl hover:-translate-y-2 group">
+                <div className="w-14 h-14 bg-slate-900 text-white rounded-[1.5rem] flex items-center justify-center font-black text-2xl mb-4 shadow-xl transition-transform group-hover:rotate-6">
                   {summary.zone}
                 </div>
-                <div className="space-y-1">
+                <div className="w-full space-y-3">
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">จำนวนงาน</span>
-                    <span className="text-xl font-black text-slate-900">{summary.jobCount}</span>
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">JOBS</span>
+                    <span className="text-2xl font-black text-slate-900 leading-none">{summary.jobCount}</span>
                   </div>
-                  <div className="flex flex-col border-t border-slate-50 pt-1">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">จำนวนกล่อง</span>
-                    <span className="text-lg font-black text-blue-600">{summary.boxCount}</span>
+                  <div className="pt-3 border-t border-slate-50 flex flex-col">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">BOXES</span>
+                    <span className="text-xl font-black text-blue-600 leading-none">{summary.boxCount}</span>
                   </div>
                 </div>
               </div>
@@ -173,49 +160,47 @@ const AdminDashboard: React.FC = () => {
           </div>
 
           {/* Table View */}
-          <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
-            <div className="p-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
-              <h3 className="font-black text-slate-700 uppercase text-xs tracking-widest">ตารางแสดงรายการงานที่ค้างในระบบ</h3>
-              <span className="bg-white px-4 py-1.5 rounded-full border border-slate-200 text-[10px] font-black text-slate-500 uppercase">รวม {activeJobs.length} รายการ</span>
+          <div className="bg-white rounded-[3rem] border border-slate-100 shadow-2xl overflow-hidden">
+            <div className="p-8 bg-slate-900 flex justify-between items-center">
+              <h3 className="font-black text-white uppercase text-xs tracking-[0.2em]">Active Inventory Records</h3>
+              <div className="flex items-center gap-3">
+                 <span className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
+                 <span className="text-[10px] font-black text-white/60 uppercase">Live Database</span>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
-                <thead className="bg-slate-50 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b">
+                <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b">
                   <tr>
-                    <th className="px-6 py-5">รายละเอียดงาน / ไซส์สินค้า</th>
-                    <th className="px-6 py-5">เวลา (C=สร้าง / P=เบิก / R=คืน)</th>
-                    <th className="px-6 py-5 text-center">โซน</th>
-                    <th className="px-6 py-5 text-right">จัดการ</th>
+                    <th className="px-8 py-6">IDENTIFIER</th>
+                    <th className="px-8 py-6 text-center">LOCATION</th>
+                    <th className="px-8 py-6">ACTIVITY LOG</th>
+                    <th className="px-8 py-6 text-right">ACTION</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {activeJobs.length === 0 ? (
-                    <tr><td colSpan={4} className="px-6 py-20 text-center text-slate-400 font-black uppercase text-xs">ไม่พบรายการงานที่กำลังดำเนินการ</td></tr>
+                    <tr><td colSpan={4} className="px-8 py-32 text-center text-slate-300 font-black uppercase tracking-widest text-sm">No Active Data Found</td></tr>
                   ) : (
                     activeJobs.map(job => (
-                      <tr key={job.id} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="px-6 py-5">
-                          <div className="font-black text-slate-900 text-lg leading-tight">{job.jobNumber}</div>
-                          <div className="text-xs text-slate-500 font-bold">{job.jobName}</div>
-                          <div className="mt-2 text-[10px] font-black text-blue-600 uppercase bg-blue-50 px-2 py-0.5 w-fit rounded">
-                            ไซส์สินค้า: {job.productSize}
+                      <tr key={job.id} className="hover:bg-slate-50/80 transition-all group">
+                        <td className="px-8 py-6">
+                          <div className="font-black text-slate-900 text-lg leading-tight uppercase group-hover:text-blue-600 transition-colors">{job.jobNumber}</div>
+                          <div className="text-[10px] text-slate-400 font-black uppercase mt-1 tracking-wider">{job.jobName}</div>
+                          <div className="mt-3 text-[9px] font-black text-blue-600 uppercase bg-blue-50 px-2 py-1 w-fit rounded-lg border border-blue-100">
+                             Size: {job.productSize}
                           </div>
                         </td>
-                        <td className="px-6 py-5 font-mono text-[9px] text-slate-400 space-y-1">
-                          <div><span className="text-blue-500 font-black">C:</span> {new Date(job.createdAt).toLocaleString('th-TH')}</div>
-                          {job.pulledAt && <div><span className="text-purple-500 font-black">P:</span> {new Date(job.pulledAt).toLocaleString('th-TH')}</div>}
-                          {job.returnedAt && <div><span className="text-green-500 font-black">R:</span> {new Date(job.returnedAt).toLocaleString('th-TH')}</div>}
+                        <td className="px-8 py-6">
+                           <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black mx-auto shadow-xl group-hover:scale-110 transition-transform">{job.zone}</div>
                         </td>
-                        <td className="px-6 py-5">
-                          <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black mx-auto shadow-lg">{job.zone}</div>
+                        <td className="px-8 py-6 font-mono text-[10px] text-slate-400 space-y-1.5">
+                          <div className="flex items-center gap-2"><span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span> <span className="font-black text-slate-600">CREATED:</span> {new Date(job.createdAt).toLocaleString()}</div>
+                          {job.pulledAt && <div className="flex items-center gap-2"><span className="w-1.5 h-1.5 bg-purple-500 rounded-full"></span> <span className="font-black text-slate-600">PULLED:</span> {new Date(job.pulledAt).toLocaleString()}</div>}
                         </td>
-                        <td className="px-6 py-5 text-right">
-                          <button 
-                            onClick={() => setDeleteConfirm({id: job.id, no: job.jobNumber})} 
-                            className="p-3 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-xl transition-all shadow-sm active:scale-90 flex items-center justify-center ml-auto"
-                            title="ลบงานนี้ไปที่ถังขยะ"
-                          >
-                            <span className="text-lg">🗑️</span>
+                        <td className="px-8 py-6 text-right">
+                          <button onClick={() => setDeleteConfirm({id: job.id, no: job.jobNumber})} className="p-4 bg-red-50 text-red-500 hover:bg-red-600 hover:text-white rounded-[1.5rem] transition-all active:scale-90 shadow-sm">
+                            <span className="text-xl">🗑️</span>
                           </button>
                         </td>
                       </tr>
@@ -225,99 +210,100 @@ const AdminDashboard: React.FC = () => {
               </table>
             </div>
           </div>
-        </>
+        </div>
       )}
 
       {view === 'create-job' && (
-        <div className="max-w-4xl mx-auto bg-white rounded-[3rem] shadow-2xl border border-slate-100 overflow-hidden animate-in slide-in-from-bottom-4 duration-500">
-          <div className="p-8 bg-slate-900 text-white">
-            <h2 className="text-2xl font-black tracking-tight uppercase">ลงทะเบียนงานใหม่</h2>
+        <div className="max-w-4xl mx-auto bg-white rounded-[3.5rem] shadow-2xl border border-slate-100 overflow-hidden animate-in slide-in-from-bottom-10 duration-700">
+          <div className="p-10 bg-slate-900 text-white relative">
+            <h2 className="text-3xl font-black tracking-tighter uppercase">ลงทะเบียนงานใหม่</h2>
+            <p className="text-white/40 text-[10px] font-black uppercase tracking-[0.2em] mt-2">Inventory Input Module</p>
           </div>
-          <form onSubmit={handleCreateJob} className="p-8 space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <form onSubmit={handleCreateJob} className="p-10 space-y-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
               <div className="md:col-span-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">ชื่อโปรเจกต์ / รายละเอียดงาน</label>
-                <input type="text" value={jobName} onChange={e => setJobName(e.target.value)} className="w-full px-5 py-4 border-2 border-slate-100 rounded-2xl font-black focus:border-blue-500 outline-none" placeholder="ระบุรายละเอียดงาน" required />
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block ml-1">รายละเอียดงาน</label>
+                <input type="text" value={jobName} onChange={e => setJobName(e.target.value)} className="w-full px-6 py-5 bg-slate-50 border-2 border-slate-50 rounded-2xl font-black focus:border-blue-500 focus:bg-white outline-none transition-all text-lg" placeholder="Project Name / Description" required />
               </div>
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">ไซส์สินค้า (PRODUCT SIZE)</label>
-                <input type="text" value={productSize} onChange={e => setProductSize(e.target.value)} className="w-full px-5 py-4 border-2 border-slate-100 rounded-2xl font-black focus:border-blue-500 outline-none" placeholder="เช่น XL, G-HK.0, หรือ 50ซม." required />
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block ml-1">ไซส์สินค้า</label>
+                <input type="text" value={productSize} onChange={e => setProductSize(e.target.value)} className="w-full px-6 py-5 bg-slate-50 border-2 border-slate-50 rounded-2xl font-black focus:border-blue-500 focus:bg-white outline-none transition-all text-lg" placeholder="e.g. 50x50x80" required />
               </div>
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">เลือกลูกค้า</label>
-                <select value={selectedCustomerId} onChange={e => setSelectedCustomerId(e.target.value)} className="w-full px-5 py-4 border-2 border-slate-100 rounded-2xl font-black bg-white focus:border-blue-500 outline-none" required>
-                  <option value="">-- เลือกบริษัทลูกค้า --</option>
-                  {data.customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block ml-1">โซนจัดเก็บ</label>
+                <select value={zone} onChange={e => setZone(e.target.value)} className="w-full px-6 py-5 bg-slate-50 border-2 border-slate-50 rounded-2xl font-black focus:border-blue-500 focus:bg-white outline-none transition-all text-lg appearance-none">
+                  {ZONES.map(z => <option key={z} value={z}>ZONE {z}</option>)}
                 </select>
               </div>
-              <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">โซนจัดเก็บเริ่มต้น</label>
-                <select value={zone} onChange={e => setZone(e.target.value)} className="w-full px-5 py-4 border-2 border-slate-100 rounded-2xl font-black bg-white focus:border-blue-500 outline-none">
-                  {ZONES.map(z => <option key={z} value={z}>ZONE {z}</option>)}
+              <div className="md:col-span-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block ml-1">เลือกลูกค้า</label>
+                <select value={selectedCustomerId} onChange={e => setSelectedCustomerId(e.target.value)} className="w-full px-6 py-5 bg-slate-50 border-2 border-slate-50 rounded-2xl font-black focus:border-blue-500 focus:bg-white outline-none transition-all text-lg appearance-none" required>
+                  <option value="">-- SELECT CLIENT --</option>
+                  {data.customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
             </div>
 
-            <div className="pt-8 border-t border-slate-50">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="font-black text-xs uppercase tracking-widest text-slate-400">รายละเอียดกล่องสินค้า</h3>
-                <button type="button" onClick={handleAddBox} className="px-6 py-2 bg-slate-900 text-white rounded-xl text-xs font-black hover:bg-slate-800 shadow-lg">+ เพิ่มกล่อง</button>
+            <div className="pt-10 border-t border-slate-100">
+              <div className="flex justify-between items-center mb-8">
+                <h3 className="font-black text-xs uppercase tracking-widest text-slate-400">Box Contents & Specs</h3>
+                <button type="button" onClick={handleAddBox} className="px-8 py-3 bg-slate-900 text-white rounded-2xl text-[10px] font-black hover:bg-slate-800 shadow-xl transition-all active:scale-95 uppercase tracking-widest">+ Add Box</button>
               </div>
               <div className="space-y-4">
                 {newJobBoxes.map((box, idx) => (
-                  <div key={box.id} className="p-6 bg-slate-50 rounded-3xl border border-slate-100 flex flex-wrap gap-4 items-end relative transition-all hover:bg-white hover:shadow-md">
-                    <button type="button" onClick={() => setNewJobBoxes(newJobBoxes.filter(b => b.id !== box.id))} className="absolute -top-3 -right-3 w-8 h-8 bg-red-500 text-white rounded-full text-lg font-black shadow-lg flex items-center justify-center">×</button>
-                    <div className="flex-1 min-w-[150px]">
-                      <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">รหัสกล่อง</label>
+                  <div key={box.id} className="p-8 bg-slate-50 rounded-[2rem] border-2 border-slate-50 flex flex-wrap gap-6 items-end relative transition-all hover:bg-white hover:border-slate-100 hover:shadow-xl group">
+                    <button type="button" onClick={() => setNewJobBoxes(newJobBoxes.filter(b => b.id !== box.id))} className="absolute -top-3 -right-3 w-10 h-10 bg-red-500 text-white rounded-full text-xl font-black shadow-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity transition-transform hover:scale-110">×</button>
+                    <div className="flex-1 min-w-[180px]">
+                      <label className="block text-[8px] font-black text-slate-400 uppercase mb-2 ml-1">Box Identifier</label>
                       <input type="text" value={box.boxNumber} onChange={e => {
                         const updated = [...newJobBoxes]; updated[idx].boxNumber = e.target.value; setNewJobBoxes(updated);
-                      }} className="w-full px-4 py-2 text-xs font-black rounded-xl border border-slate-200" />
+                      }} className="w-full px-5 py-3 text-sm font-black rounded-xl border-2 border-white bg-white group-hover:bg-slate-50 transition-all focus:border-blue-500 outline-none" />
                     </div>
-                    <div className="flex-1 min-w-[120px]">
-                      <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">ไซส์กล่อง (BOX SIZE)</label>
+                    <div className="flex-1 min-w-[140px]">
+                      <label className="block text-[8px] font-black text-slate-400 uppercase mb-2 ml-1">Box Dimension</label>
                       <input type="text" value={box.boxSize} onChange={e => {
                         const updated = [...newJobBoxes]; updated[idx].boxSize = e.target.value; setNewJobBoxes(updated);
-                      }} className="w-full px-4 py-2 text-xs font-black rounded-xl border border-slate-200" placeholder="ระบุขนาดกล่อง" />
+                      }} className="w-full px-5 py-3 text-sm font-black rounded-xl border-2 border-white bg-white group-hover:bg-slate-50 transition-all focus:border-blue-500 outline-none" placeholder="Size" />
                     </div>
                     <div className="w-32">
-                      <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">มูลค่า (฿)</label>
+                      <label className="block text-[8px] font-black text-slate-400 uppercase mb-2 ml-1">Asset Value</label>
                       <input type="number" value={box.price} onChange={e => {
                         const updated = [...newJobBoxes]; updated[idx].price = parseFloat(e.target.value) || 0; setNewJobBoxes(updated);
-                      }} className="w-full px-4 py-2 text-xs font-black rounded-xl border border-slate-200" />
+                      }} className="w-full px-5 py-3 text-sm font-black rounded-xl border-2 border-white bg-white group-hover:bg-slate-50 transition-all focus:border-blue-500 outline-none" />
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            <button type="submit" className="w-full py-5 bg-green-600 hover:bg-green-700 text-white font-black rounded-3xl shadow-xl transition-all disabled:opacity-50 text-xl" disabled={newJobBoxes.length === 0}>
-              ✅ ยืนยันการสร้างงาน
+            <button type="submit" className="w-full py-6 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-[2rem] shadow-2xl shadow-blue-200 transition-all disabled:opacity-50 text-xl uppercase tracking-tighter active:scale-[0.98]" disabled={newJobBoxes.length === 0}>
+              Create Production Job
             </button>
           </form>
         </div>
       )}
 
       {view === 'customers' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm h-fit">
-            <h3 className="font-black text-slate-900 text-xl mb-4 tracking-tight">เพิ่มรายชื่อลูกค้า</h3>
-            <form onSubmit={handleCreateCustomer} className="space-y-4">
-              <input type="text" placeholder="ชื่อบริษัท / ชื่อลูกค้า" value={custName} onChange={e => setCustName(e.target.value)} className="w-full px-4 py-3 border-2 border-slate-50 rounded-2xl font-bold focus:border-blue-500 outline-none" required />
-              <input type="text" placeholder="ข้อมูลการติดต่อ" value={custContact} onChange={e => setCustContact(e.target.value)} className="w-full px-4 py-3 border-2 border-slate-50 rounded-2xl font-bold focus:border-blue-500 outline-none" />
-              <button type="submit" className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black shadow-lg">บันทึกข้อมูลลูกค้า</button>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="lg:col-span-4 bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-xl h-fit">
+            <h3 className="font-black text-slate-900 text-2xl mb-6 tracking-tight uppercase">New Client</h3>
+            <form onSubmit={handleCreateCustomer} className="space-y-6">
+              <input type="text" placeholder="Company / Client Name" value={custName} onChange={e => setCustName(e.target.value)} className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-50 rounded-2xl font-black focus:border-blue-500 outline-none transition-all" required />
+              <input type="text" placeholder="Contact Information" value={custContact} onChange={e => setCustContact(e.target.value)} className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-50 rounded-2xl font-black focus:border-blue-500 outline-none transition-all" />
+              <button type="submit" className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black shadow-xl uppercase tracking-widest text-xs hover:bg-slate-800 active:scale-95 transition-all">Add to Records</button>
             </form>
           </div>
-          <div className="lg:col-span-2 bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+          <div className="lg:col-span-8 bg-white rounded-[3.5rem] border border-slate-100 shadow-2xl overflow-hidden">
              <table className="w-full text-left">
-               <thead className="text-[10px] font-black text-slate-400 uppercase bg-slate-50/50">
-                 <tr><th className="px-6 py-4">ID</th><th className="px-6 py-4">ชื่อลูกค้า</th><th className="px-6 py-4">การติดต่อ</th></tr>
+               <thead className="text-[10px] font-black text-slate-400 uppercase bg-slate-50/50 tracking-widest border-b">
+                 <tr><th className="px-8 py-6">ID</th><th className="px-8 py-6">CLIENT NAME</th><th className="px-8 py-6">CONTACT</th></tr>
                </thead>
                <tbody className="divide-y divide-slate-50 text-sm">
                  {data.customers.map(c => (
-                   <tr key={c.id}>
-                     <td className="px-6 py-4 font-mono text-[10px] text-slate-400">{c.id}</td>
-                     <td className="px-6 py-4 font-black text-slate-800">{c.name}</td>
-                     <td className="px-6 py-4 font-bold text-slate-500">{c.contact || '-'}</td>
+                   <tr key={c.id} className="hover:bg-slate-50/30 transition-all">
+                     <td className="px-8 py-6 font-mono text-[10px] text-slate-300">{c.id}</td>
+                     <td className="px-8 py-6 font-black text-slate-900 uppercase tracking-tight">{c.name}</td>
+                     <td className="px-8 py-6 font-bold text-slate-400">{c.contact || 'N/A'}</td>
                    </tr>
                  ))}
                </tbody>
