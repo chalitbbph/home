@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { UserRole } from '../types';
 
@@ -14,6 +13,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, activeTab, onTabChange, onLogou
   const tabs = [
     { id: 'finding', label: 'ศูนย์ค้นหา', icon: '🔍' },
     { id: 'operation', label: 'หน้าปฏิบัติงาน', icon: '⚡' },
+    { id: 'edit', label: 'แก้ไขข้อมูล', icon: '✏️' },
   ];
 
   if (role === 'admin') {
