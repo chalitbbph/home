@@ -315,19 +315,27 @@ const AdminDashboard: React.FC<Props> = ({ data, onRefresh }) => {
                   <div key={box.id} className="p-8 bg-slate-50 rounded-[2rem] border-2 border-slate-50 flex flex-wrap gap-6 items-end relative transition-all hover:bg-white hover:border-slate-100 hover:shadow-xl group">
                     <button type="button" onClick={() => setNewJobBoxes(newJobBoxes.filter(b => b.id !== box.id))} className="absolute -top-3 -right-3 w-10 h-10 bg-red-500 text-white rounded-full text-xl font-black shadow-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity transition-transform hover:scale-110">×</button>
                     <div className="flex-1 min-w-[180px]">
-                      <label className="block text-[8px] font-black text-slate-400 uppercase mb-2 ml-1">Box Identifier</label>
+                      <label className="block text-[8px] font-black text-slate-400 uppercase mb-2 ml-1">หมายเลขกล่อง</label>
                       <input type="text" value={box.boxNumber} onChange={e => {
                         const updated = [...newJobBoxes]; updated[idx].boxNumber = e.target.value; setNewJobBoxes(updated);
                       }} className="w-full px-5 py-3 text-sm font-black rounded-xl border-2 border-white bg-white group-hover:bg-slate-50 transition-all focus:border-blue-500 outline-none" />
                     </div>
                     <div className="flex-1 min-w-[140px]">
-                      <label className="block text-[8px] font-black text-slate-400 uppercase mb-2 ml-1">Box Dimension</label>
+                      <label className="block text-[8px] font-black text-slate-400 uppercase mb-2 ml-1">ขนาดกล่อง</label>
                       <input type="text" value={box.boxSize} onChange={e => {
                         const updated = [...newJobBoxes]; updated[idx].boxSize = e.target.value; setNewJobBoxes(updated);
-                      }} className="w-full px-5 py-3 text-sm font-black rounded-xl border-2 border-white bg-white group-hover:bg-slate-50 transition-all focus:border-blue-500 outline-none" placeholder="Size" />
+                      }} className="w-full px-5 py-3 text-sm font-black rounded-xl border-2 border-white bg-white group-hover:bg-slate-50 transition-all focus:border-blue-500 outline-none" placeholder="ขนาด" />
                     </div>
                     <div className="w-32">
-                      <label className="block text-[8px] font-black text-slate-400 uppercase mb-2 ml-1">Asset Value</label>
+                      <label className="block text-[8px] font-black text-slate-400 uppercase mb-2 ml-1">สีกล่อง</label>
+                      <select value={box.color} onChange={e => {
+                        const updated = [...newJobBoxes]; updated[idx].color = e.target.value; setNewJobBoxes(updated);
+                      }} className="w-full px-5 py-3 text-sm font-black rounded-xl border-2 border-white bg-white group-hover:bg-slate-50 transition-all focus:border-blue-500 outline-none appearance-none">
+                        {COLORS.map(color => <option key={color} value={color}>{color}</option>)}
+                      </select>
+                    </div>
+                    <div className="w-32">
+                      <label className="block text-[8px] font-black text-slate-400 uppercase mb-2 ml-1">มูลค่า (฿)</label>
                       <input type="number" value={box.price} onChange={e => {
                         const updated = [...newJobBoxes]; updated[idx].price = parseFloat(e.target.value) || 0; setNewJobBoxes(updated);
                       }} className="w-full px-5 py-3 text-sm font-black rounded-xl border-2 border-white bg-white group-hover:bg-slate-50 transition-all focus:border-blue-500 outline-none" />
