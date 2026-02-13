@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { User, SystemData } from './types.ts';
 import Login from './components/Login.tsx';
@@ -7,6 +6,7 @@ import FindingView from './components/FindingView.tsx';
 import OperationView from './components/OperationView.tsx';
 import AdminDashboard from './components/AdminDashboard.tsx';
 import TrashBox from './components/TrashBox.tsx';
+import JobEditView from './components/JobEditView.tsx';
 import { storageService } from './services/storageService.ts';
 
 const App: React.FC = () => {
@@ -91,8 +91,7 @@ const App: React.FC = () => {
     <div className="flex h-screen bg-slate-50">
       <Sidebar 
         role={user.role} 
-        activeTab={activeTab} 
-        onTabChange={setActiveTab} 
+        activeTab={activeTab} onTabChange={setActiveTab} 
         onLogout={handleLogout} 
         isSyncing={syncing}
       />
@@ -104,6 +103,9 @@ const App: React.FC = () => {
           )}
           {activeTab === 'operation' && data && (
             <OperationView data={data} onRefresh={fetchData} onNavigate={(tab) => setActiveTab(tab)} />
+          )}
+          {activeTab === 'edit' && data && (
+            <JobEditView data={data} onRefresh={fetchData} />
           )}
           {activeTab === 'trash' && user.role === 'admin' && data && (
             <TrashBox data={data} onRefresh={fetchData} />
