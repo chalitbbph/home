@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { storageService } from '../services/storageService';
 import { Job, SystemData, Box } from '../types';
@@ -141,7 +140,10 @@ const OperationView: React.FC<OperationViewProps> = ({ data, onRefresh, onNaviga
                 {selectedJob.boxes.map(box => (
                   <div key={box.id} className={`p-5 rounded-3xl border-2 bg-slate-50 ${box.hasIssue ? 'border-red-200 shadow-inner' : 'border-slate-50 shadow-sm'}`}>
                     <div className="flex justify-between items-start mb-3">
-                       <span className="font-black text-slate-900">{box.boxNumber}</span>
+                       <div className="flex items-center gap-2">
+                         <span className="font-black text-slate-900">{box.boxNumber}</span>
+                         <span className="text-xs bg-slate-200 px-2 py-0.5 rounded font-bold">{box.color}</span>
+                       </div>
                        <button onClick={() => toggleBoxIssue(box.id)} className={`text-lg transition-opacity ${box.hasIssue ? 'opacity-100' : 'opacity-30'}`}>🚩</button>
                     </div>
                     <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase mb-1">
