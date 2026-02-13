@@ -1,16 +1,13 @@
-
 import React, { useState, useMemo } from 'react';
 import { storageService } from '../services/storageService';
 import { Job, Box, SystemData, Customer } from '../types';
 import { ZONES, COLORS } from '../constants';
 
-// Fix: Add interface for props
 interface Props {
   data: SystemData;
   onRefresh: () => void;
 }
 
-// Fix: Use data and onRefresh from props
 const AdminDashboard: React.FC<Props> = ({ data, onRefresh }) => {
   const [view, setView] = useState<'overview' | 'create-job' | 'customers'>('overview');
   const [newJobBoxes, setNewJobBoxes] = useState<Box[]>([]);
@@ -19,11 +16,16 @@ const AdminDashboard: React.FC<Props> = ({ data, onRefresh }) => {
 
   const [custName, setCustName] = useState('');
   const [custContact, setCustContact] = useState('');
+  const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
+  const [customerError, setCustomerError] = useState<string | null>(null);
+  const [customerSuccess, setCustomerSuccess] = useState<string | null>(null);
 
   const [jobName, setJobName] = useState('');
   const [productSize, setProductSize] = useState(''); 
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [zone, setZone] = useState('A');
+  const [isCreatingJob, setIsCreatingJob] = useState(false);
+  const [jobError, setJobError] = useState<string | null>(null);
 
   const activeJobs = useMemo(() => data.jobs.filter(j => j.status !== 'deleted'), [data.jobs]);
 
@@ -55,53 +57,106 @@ const AdminDashboard: React.FC<Props> = ({ data, onRefresh }) => {
     setNewJobBoxes([...newJobBoxes, newBox]);
   };
 
-  // Fix: handleCreateCustomer must be async to await storage service
   const handleCreateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!custName) return;
-    const newCust: Customer = {
-      id: 'CUST-' + Math.random().toString(36).substr(2, 5).toUpperCase(),
-      name: custName,
-      contact: custContact,
-      createdAt: new Date().toISOString()
-    };
-    await storageService.createCustomer(newCust);
-    setCustName(''); setCustContact('');
-    onRefresh();
+    
+    setIsCreatingCustomer(true);
+    setCustomerError(null);
+    setCustomerSuccess(null);
+    
+    try {
+      console.log('🔵 Starting customer creation...');
+      
+      const newCust: Customer = {
+        id: 'CUST-' + Math.random().toString(36).substr(2, 5).toUpperCase(),
+        name: custName,
+        contact: custContact,
+        createdAt: new Date().toISOString()
+      };
+      
+      console.log('🔵 New customer object:', newCust);
+      
+      await storageService.createCustomer(newCust);
+      
+      console.log('✅ Customer created successfully');
+      
+      setCustName(''); 
+      setCustContact('');
+      setCustomerSuccess('✅ เพิ่มลูกค้าสำเร็จ!');
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setCustomerSuccess(null), 3000);
+      
+      onRefresh();
+    } catch (error) {
+      console.error('❌ Error creating customer:', error);
+      setCustomerError(
+        error instanceof Error 
+          ? `เกิดข้อผิดพลาด: ${error.message}` 
+          : 'ไม่สามารถเพิ่มลูกค้าได้ กรุณาลองใหม่'
+      );
+    } finally {
+      setIsCreatingCustomer(false);
+    }
   };
 
-  // Fix: handleCreateJob must be async to await storage service
   const handleCreateJob = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    setJobError(null);
+    
     if (!jobName || !selectedCustomerId || !productSize || newJobBoxes.length === 0) {
-      alert("⚠️ กรุณากรอกรายละเอียดให้ครบ");
+      setJobError("⚠️ กรุณากรอกรายละเอียดให้ครบ");
       return;
     }
 
-    const newJob: Job = {
-      id: Math.random().toString(36).substr(2, 9),
-      jobNumber: `JOB-${Date.now().toString().slice(-6)}`,
-      jobName,
-      productSize, 
-      customerId: selectedCustomerId,
-      zone,
-      status: 'stored',
-      boxes: newJobBoxes,
-      createdAt: new Date().toISOString()
-    };
+    setIsCreatingJob(true);
 
-    await storageService.createJob(newJob);
-    setJobName(''); setProductSize(''); setSelectedCustomerId(''); setNewJobBoxes([]);
-    onRefresh();
-    setView('overview');
+    try {
+      const newJob: Job = {
+        id: Math.random().toString(36).substr(2, 9),
+        jobNumber: `JOB-${Date.now().toString().slice(-6)}`,
+        jobName,
+        productSize, 
+        customerId: selectedCustomerId,
+        zone,
+        status: 'stored',
+        boxes: newJobBoxes,
+        createdAt: new Date().toISOString()
+      };
+
+      await storageService.createJob(newJob);
+      
+      setJobName(''); 
+      setProductSize(''); 
+      setSelectedCustomerId(''); 
+      setNewJobBoxes([]);
+      
+      onRefresh();
+      setView('overview');
+    } catch (error) {
+      console.error('❌ Error creating job:', error);
+      setJobError(
+        error instanceof Error 
+          ? `เกิดข้อผิดพลาด: ${error.message}` 
+          : 'ไม่สามารถสร้างงานได้ กรุณาลองใหม่'
+      );
+    } finally {
+      setIsCreatingJob(false);
+    }
   };
 
-  // Fix: executeDelete must be async to await storage service
   const executeDelete = async () => {
     if (deleteConfirm) {
-      await storageService.deleteJob(deleteConfirm.id);
-      setDeleteConfirm(null);
-      onRefresh();
+      try {
+        await storageService.deleteJob(deleteConfirm.id);
+        setDeleteConfirm(null);
+        onRefresh();
+      } catch (error) {
+        console.error('❌ Error deleting job:', error);
+        alert('ไม่สามารถลบงานได้ กรุณาลองใหม่');
+      }
     }
   };
 
@@ -220,6 +275,12 @@ const AdminDashboard: React.FC<Props> = ({ data, onRefresh }) => {
             <p className="text-white/40 text-[10px] font-black uppercase tracking-[0.2em] mt-2">Inventory Input Module</p>
           </div>
           <form onSubmit={handleCreateJob} className="p-10 space-y-10">
+            {jobError && (
+              <div className="p-4 bg-red-50 border-2 border-red-200 rounded-2xl text-red-600 font-bold text-sm animate-pulse">
+                {jobError}
+              </div>
+            )}
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
               <div className="md:col-span-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block ml-1">รายละเอียดงาน</label>
@@ -276,8 +337,12 @@ const AdminDashboard: React.FC<Props> = ({ data, onRefresh }) => {
               </div>
             </div>
 
-            <button type="submit" className="w-full py-6 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-[2rem] shadow-2xl shadow-blue-200 transition-all disabled:opacity-50 text-xl uppercase tracking-tighter active:scale-[0.98]" disabled={newJobBoxes.length === 0}>
-              Create Production Job
+            <button 
+              type="submit" 
+              disabled={newJobBoxes.length === 0 || isCreatingJob}
+              className="w-full py-6 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-[2rem] shadow-2xl shadow-blue-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-xl uppercase tracking-tighter active:scale-[0.98]"
+            >
+              {isCreatingJob ? 'กำลังสร้าง...' : 'Create Production Job'}
             </button>
           </form>
         </div>
@@ -287,10 +352,44 @@ const AdminDashboard: React.FC<Props> = ({ data, onRefresh }) => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-4 bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-xl h-fit">
             <h3 className="font-black text-slate-900 text-2xl mb-6 tracking-tight uppercase">New Client</h3>
+            
+            {customerError && (
+              <div className="mb-4 p-4 bg-red-50 border-2 border-red-200 rounded-2xl text-red-600 font-bold text-sm animate-pulse">
+                {customerError}
+              </div>
+            )}
+            
+            {customerSuccess && (
+              <div className="mb-4 p-4 bg-green-50 border-2 border-green-200 rounded-2xl text-green-600 font-bold text-sm animate-pulse">
+                {customerSuccess}
+              </div>
+            )}
+            
             <form onSubmit={handleCreateCustomer} className="space-y-6">
-              <input type="text" placeholder="Company / Client Name" value={custName} onChange={e => setCustName(e.target.value)} className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-50 rounded-2xl font-black focus:border-blue-500 outline-none transition-all" required />
-              <input type="text" placeholder="Contact Information" value={custContact} onChange={e => setCustContact(e.target.value)} className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-50 rounded-2xl font-black focus:border-blue-500 outline-none transition-all" />
-              <button type="submit" className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black shadow-xl uppercase tracking-widest text-xs hover:bg-slate-800 active:scale-95 transition-all">Add to Records</button>
+              <input 
+                type="text" 
+                placeholder="Company / Client Name" 
+                value={custName} 
+                onChange={e => setCustName(e.target.value)} 
+                className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-50 rounded-2xl font-black focus:border-blue-500 outline-none transition-all" 
+                required 
+                disabled={isCreatingCustomer}
+              />
+              <input 
+                type="text" 
+                placeholder="Contact Information" 
+                value={custContact} 
+                onChange={e => setCustContact(e.target.value)} 
+                className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-50 rounded-2xl font-black focus:border-blue-500 outline-none transition-all" 
+                disabled={isCreatingCustomer}
+              />
+              <button 
+                type="submit" 
+                disabled={isCreatingCustomer}
+                className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black shadow-xl uppercase tracking-widest text-xs hover:bg-slate-800 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isCreatingCustomer ? 'กำลังบันทึก...' : 'Add to Records'}
+              </button>
             </form>
           </div>
           <div className="lg:col-span-8 bg-white rounded-[3.5rem] border border-slate-100 shadow-2xl overflow-hidden">
@@ -299,13 +398,17 @@ const AdminDashboard: React.FC<Props> = ({ data, onRefresh }) => {
                  <tr><th className="px-8 py-6">ID</th><th className="px-8 py-6">CLIENT NAME</th><th className="px-8 py-6">CONTACT</th></tr>
                </thead>
                <tbody className="divide-y divide-slate-50 text-sm">
-                 {data.customers.map(c => (
-                   <tr key={c.id} className="hover:bg-slate-50/30 transition-all">
-                     <td className="px-8 py-6 font-mono text-[10px] text-slate-300">{c.id}</td>
-                     <td className="px-8 py-6 font-black text-slate-900 uppercase tracking-tight">{c.name}</td>
-                     <td className="px-8 py-6 font-bold text-slate-400">{c.contact || 'N/A'}</td>
-                   </tr>
-                 ))}
+                 {data.customers.length === 0 ? (
+                   <tr><td colSpan={3} className="px-8 py-20 text-center text-slate-300 font-black uppercase">No customers yet</td></tr>
+                 ) : (
+                   data.customers.map(c => (
+                     <tr key={c.id} className="hover:bg-slate-50/30 transition-all">
+                       <td className="px-8 py-6 font-mono text-[10px] text-slate-300">{c.id}</td>
+                       <td className="px-8 py-6 font-black text-slate-900 uppercase tracking-tight">{c.name}</td>
+                       <td className="px-8 py-6 font-bold text-slate-400">{c.contact || 'N/A'}</td>
+                     </tr>
+                   ))
+                 )}
                </tbody>
              </table>
           </div>
